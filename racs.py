@@ -3,6 +3,8 @@ import queue
 import threading
 import msgpack
 import struct
+import mmh3
+import crc32c
 
 from datetime import datetime, timezone
 from uuid import getnode as get_mac
@@ -74,7 +76,7 @@ def decode_null(data) -> None:
     return None
 
 def decode_list(data) -> []:
-    return data[1]
+    return data[1:]
 
 def decode_u8v(data) -> bytes:
     return data[1]
@@ -107,7 +109,7 @@ def decode(b):
 
 class Frame:
     def __init__(self):
-        self._chunk_id: bytes = b"atsp"
+        self._chunk_id: bytes = b"rspt"
         self._mac_addr: int = get_mac()
         self._stream_id: int = 0
         self._checksum: int = 0
@@ -130,23 +132,19 @@ class Frame:
         return self._stream_id
 
     @stream_id.setter
-    def stream_id(self, stream_id):
-        self._stream_id = stream_id
+    def stream_id(self, stream_id: str):
+        self._stream_id = mmh3.hash64(stream_id)[0]
 
     @property
     def checksum(self):
         return self._checksum
-
-    @checksum.setter
-    def checksum(self, checksum):
-        self._checksum = checksum
 
     @property
     def sample_rate(self):
         return self._sample_rate
 
     @sample_rate.setter
-    def sample_rate(self, sample_rate):
+    def sample_rate(self, sample_rate: int):
         self._sample_rate = sample_rate
 
     @property
@@ -154,23 +152,19 @@ class Frame:
         return self._bit_depth
 
     @bit_depth.setter
-    def bit_depth(self, bit_depth):
+    def bit_depth(self, bit_depth: int):
         self._bit_depth = bit_depth
 
     @property
     def block_size(self):
         return self._block_size
 
-    @block_size.setter
-    def block_size(self, block_size):
-        self._block_size = block_size
-
     @property
     def channels(self):
         return self._channels
 
     @channels.setter
-    def channels(self, channels):
+    def channels(self, channels: int):
         self._channels = channels
 
     @property
@@ -178,8 +172,10 @@ class Frame:
         return self._data
 
     @data.setter
-    def data(self, data):
+    def data(self, data: list[int]):
         self._data = data
+        self._checksum = crc32c.crc32c(self._data)
+        self._block_size = len(self._data)
 
     def encode(self):
         b = b""
@@ -200,85 +196,134 @@ class Frame:
         return [data[i:i + n] for i in range(0, len(data), n)]
 
     @staticmethod
-    def pack(data :[int]) -> bytes:
+    def pack(data :list[int]) -> bytes:
         b = b""
         for i in data:
             b += i.to_bytes(2, "little", signed=True)
         return b
 
-class CommandBase:
+class Command:
     def __init__(self, pool: SocketPool):
         self._pool = pool
 
-    def exec(self, command: str):
+    def execute(self, command: str):
         sock = self._pool.get()
         try:
             return decode(send_request(sock, command.encode()))
         finally:
             self._pool.put(sock)
 
-    def stream(self, stream_id: str, sample_rate: int, channels: int, pcm_data: list[int]) -> None:
-        for chunk in Frame.chunk(pcm_data, 1024):
+    def stream(self, info, pcm_data: list[int]) -> None:
+        for chunk in Frame.chunk(pcm_data, info['chunk_size']):
             frame = Frame()
-            frame.stream_id = stream_id
-            frame.sample_rate = sample_rate
+            frame.stream_id = info['stream_id']
+            frame.sample_rate = info['sample_rate']
             frame.bit_depth = 16
-            frame.channels = channels
+            frame.channels = info['channels']
             frame.data = Frame.pack(chunk)
-            frame.block_size = len(frame.data)
 
             sock = self._pool.get()
             try:
-                send_request(sock, frame.encode())
+                resp = send_request(sock, frame.encode())
+                decode(resp)
             finally:
                 self._pool.put(sock)
 
-    def extract(self, stream_id: str, start: datetime, end: datetime):
-        print(f"EXTRACT '{stream_id}' {utc_iso8601(start)} {utc_iso8601(end)} ")
-        return self.exec(f"EXTRACT '{stream_id}' {utc_iso8601(start)} {utc_iso8601(end)} ")
+
+class Pipeline(Command):
+    def __init__(self, pool: SocketPool):
+        super().__init__(pool)
+        self._commands = []
+
+    def extract(self, stream_id: str, frm: datetime, to: datetime):
+        self._commands.append(f"EXTRACT '{stream_id}' {rfc3339(frm)} {rfc3339(to)}")
+        return self
+
+    def format(self, mime_type: str, channels: int, sample_rate: int):
+        self._commands.append(f"FORMAT '{mime_type}' {channels} {sample_rate}")
+        return self
 
     def create(self, stream_id: str, sample_rate: int, channels: int):
-        return self.exec(f"STREAMCREATE '{stream_id}' {sample_rate} {channels} ")
+        self._commands.append(f"CREATE '{stream_id}' {sample_rate} {channels}")
+        return self
 
     def info(self, stream_id: str, attr: str):
-        return self.exec(f"STREAMINFO '{stream_id}' '{attr}' ")
+        self._commands.append(f"INFO '{stream_id}' '{attr}'")
+        return self
 
-    def list(self, glob: str):
-        return self.exec(f"STREAMLIST '{glob}' ")
+    def list(self, pattern: str):
+        self._commands.append(f"LIST '{pattern}'")
+        return self
 
     def open(self, stream_id: str):
-        return self.exec(f"STREAMOPEN '{stream_id}' ")
+        self._commands.append(f"OPEN '{stream_id}'")
+        return self
 
     def close(self, stream_id: str):
-        return self.exec(f"STREAMCLOSE '{stream_id}' ")
+        self._commands.append(f"CLOSE '{stream_id}'")
+        return self
 
     def eval(self, expr: str):
-        return self.exec(f"EVAL '{expr}' ")
+        self._commands.append(f"EVAL '{expr}'")
+        return self
 
     def ping(self):
-        return self.exec("PING ")
+        self._commands.append("PING")
+        return self
+
+    def shutdown(self):
+        self._commands.append("SHUTDOWN")
+        return self
+
+    def commit(self):
+        return self.execute(" |> ".join(self._commands))
+
+    def reset(self):
+        self._commands.clear()
 
 
-def utc_iso8601(dt: datetime) -> str:
+def rfc3339(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
 
 class RacsException(Exception):
     def __init__(self, message):
         super().__init__(message)
 
-class Command(CommandBase):
-    def __init__(self, pool: SocketPool):
-        super().__init__(pool)
-
 class Racs(Command):
-    def __init__(self, host: str, port: int):
-        super().__init__(SocketPool(host, port, 5))
+    def __init__(self, host: str, port: int, pool_size: int = 10):
+        super().__init__(SocketPool(host, port, pool_size))
+
+    def pipeline(self):
+        return Pipeline(self._pool)
 
 
 if __name__ == '__main__':
-    racs = Racs("localhost", 8080)
-    print(racs.exec("EXTRACT 'poo' 2023-12-25T22:30:45.123Z 2026-12-25T22:30:45.123Z"))
+    # import torchaudio
+    #
+    # waveform, sample_rate = torchaudio.load("47178__suspiciononline__saxu.mp3")  # waveform: (channels, samples), float32 in [-1.0, 1.0]
+    # data = (waveform * 32768).clamp(min=-32768, max=32767).short().reshape(waveform.shape[1]).tolist()
 
-    # frm = datetime(2023, 12, 25, 17, 30, 45, 123000)
-    # to = datetime(2026, 12, 25, 17, 30, 45, 123000)
-    # print(racs.extract("poo", frm, to))
+    r = Racs("localhost", 8080)
+    pipe = r.pipeline()
+    # pipe.create('poo', 44100, 1)
+    # pipe.commit()
+    # pipe.reset()
+    #
+    # pipe.open('poo')
+    # pipe.commit()
+    # pipe.reset()
+
+    # pipe.stream({
+    #     'chunk_size': 1024,
+    #     'sample_rate': 44100,
+    #     'stream_id': 'poo',
+    #     'channels': 1
+    # }, data)
+
+    frm = datetime(2023, 12, 25, 17, 30, 45, 123000)
+    to = datetime(2026, 5, 26, 22, 56, 16, 123000)
+
+    d = pipe.extract('poo', frm, to).format('audio/mpeg', 1, 44100).commit()
+
+    with open("yo.mp3", "wb") as f:
+        f.write(d)
