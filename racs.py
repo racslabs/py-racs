@@ -1,13 +1,16 @@
+import random
 import socket
 import queue
 import threading
+import time
+from typing import Any
+
 import msgpack
 import struct
 import mmh3
 import crc32c
 
 from datetime import datetime, timezone
-from uuid import getnode as get_mac
 
 class SocketPool:
 
@@ -23,7 +26,7 @@ class SocketPool:
 
     def create_socket(self) -> socket.socket:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(0.1)
+        s.settimeout(None)
         s.connect((self._host, self._port))
         return s
 
@@ -39,22 +42,29 @@ class SocketPool:
             sock.close()
 
 
-def send_request(sock :socket.socket, request: bytes) -> bytes | None:
-    response = b''
-
+def send(sock: socket.socket, request: bytes) -> bytes | None:
     try:
+        length = len(request)
+        request = length.to_bytes(8, "little") + request
         sock.sendall(request)
-        response += sock.recv(1024)
 
-        while True:
-            response += sock.recv(1024)
+        data = sock.recv(8)
+        if not data:
+            return None
+        length = int.from_bytes(data, "little")
+
+        response = bytearray()
+        while len(response) < length:
+            chunk = sock.recv(min(4096, length - len(response)))
+            if not chunk:
+                raise ConnectionError("Socket closed before full message received")
+            response.extend(chunk)
+
+        return bytes(response)
+
     except socket.timeout:
-        pass
-
-    finally:
-        pass
-
-    return response
+        print("Timed out waiting for data")
+        return None
 
 
 def decode_error(data):
@@ -75,13 +85,13 @@ def decode_str(data) -> str:
 def decode_null(data) -> None:
     return None
 
-def decode_list(data) -> []:
+def decode_list(data) -> list[Any]:
     return data[1:]
 
 def decode_u8v(data) -> bytes:
     return data[1]
 
-def decode_i16v(data) -> [int]:
+def decode_i16v(data) -> list[Any]:
     return [x[0] for x in struct.iter_unpack('<h', data[1])]
 
 def decode(b):
@@ -110,22 +120,22 @@ def decode(b):
 class Frame:
     def __init__(self):
         self._chunk_id: bytes = b"rspt"
-        self._mac_addr: int = get_mac()
+        self._session_id: tuple[int, int] = create_session_id()
         self._stream_id: int = 0
         self._checksum: int = 0
         self._channels: int = 0
         self._sample_rate: int = 0
         self._bit_depth: int = 0
         self._block_size: int = 0
-        self._data :bytes = b""
+        self._data: bytes = b""
 
     @property
     def chunk_id(self):
         return self._chunk_id
 
     @property
-    def mac_addr(self):
-        return self._mac_addr
+    def session_id(self):
+        return self._session_id
 
     @property
     def stream_id(self):
@@ -180,7 +190,8 @@ class Frame:
     def encode(self):
         b = b""
         b += self._chunk_id
-        b += self._mac_addr.to_bytes(6, "little")
+        b += self._session_id[0].to_bytes(8, "little")
+        b += self._session_id[1].to_bytes(8, "little")
         b += self._stream_id.to_bytes(8, "little")
         b += self._checksum.to_bytes(4, "little")
         b += self._channels.to_bytes(2, "little")
@@ -202,6 +213,11 @@ class Frame:
             b += i.to_bytes(2, "little", signed=True)
         return b
 
+
+def create_session_id() -> tuple[int, int]:
+    timestamp = str(int(time.time()))
+    return mmh3.hash64(timestamp, signed=False)
+
 class Command:
     def __init__(self, pool: SocketPool):
         self._pool = pool
@@ -209,22 +225,22 @@ class Command:
     def execute(self, command: str):
         sock = self._pool.get()
         try:
-            return decode(send_request(sock, command.encode()))
+            return decode(send(sock, command.encode() + b'\0'))
         finally:
             self._pool.put(sock)
 
     def stream(self, info, pcm_data: list[int]) -> None:
-        for chunk in Frame.chunk(pcm_data, info['chunk_size']):
-            frame = Frame()
-            frame.stream_id = info['stream_id']
-            frame.sample_rate = info['sample_rate']
-            frame.bit_depth = 16
-            frame.channels = info['channels']
-            frame.data = Frame.pack(chunk)
+        frame = Frame()
+        frame.stream_id = info['stream_id']
+        frame.sample_rate = info['sample_rate']
+        frame.bit_depth = 16
+        frame.channels = info['channels']
 
+        for chunk in Frame.chunk(pcm_data, info['chunk_size']):
+            frame.data = Frame.pack(chunk)
             sock = self._pool.get()
             try:
-                resp = send_request(sock, frame.encode())
+                resp = send(sock, frame.encode())
                 decode(resp)
             finally:
                 self._pool.put(sock)
@@ -275,8 +291,10 @@ class Pipeline(Command):
         self._commands.append("SHUTDOWN")
         return self
 
-    def commit(self):
-        return self.execute(" |> ".join(self._commands))
+    def execute_pipeline(self):
+        command = " |> ".join(self._commands)
+        print(command)
+        return self.execute(command)
 
     def reset(self):
         self._commands.clear()
@@ -290,40 +308,8 @@ class RacsException(Exception):
         super().__init__(message)
 
 class Racs(Command):
-    def __init__(self, host: str, port: int, pool_size: int = 10):
+    def __init__(self, host: str, port: int, pool_size: int = 3):
         super().__init__(SocketPool(host, port, pool_size))
 
     def pipeline(self):
         return Pipeline(self._pool)
-
-
-if __name__ == '__main__':
-    # import torchaudio
-    #
-    # waveform, sample_rate = torchaudio.load("47178__suspiciononline__saxu.mp3")  # waveform: (channels, samples), float32 in [-1.0, 1.0]
-    # data = (waveform * 32768).clamp(min=-32768, max=32767).short().reshape(waveform.shape[1]).tolist()
-
-    r = Racs("localhost", 8080)
-    pipe = r.pipeline()
-    # pipe.create('poo', 44100, 1)
-    # pipe.commit()
-    # pipe.reset()
-    #
-    # pipe.open('poo')
-    # pipe.commit()
-    # pipe.reset()
-
-    # pipe.stream({
-    #     'chunk_size': 1024,
-    #     'sample_rate': 44100,
-    #     'stream_id': 'poo',
-    #     'channels': 1
-    # }, data)
-
-    frm = datetime(2023, 12, 25, 17, 30, 45, 123000)
-    to = datetime(2026, 5, 26, 22, 56, 16, 123000)
-
-    d = pipe.extract('poo', frm, to).format('audio/mpeg', 1, 44100).commit()
-
-    with open("yo.mp3", "wb") as f:
-        f.write(d)
