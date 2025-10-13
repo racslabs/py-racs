@@ -91,8 +91,11 @@ def decode_list(data) -> list[Any]:
 def decode_u8v(data) -> bytes:
     return data[1]
 
-def decode_i16v(data) -> list[Any]:
+def decode_s16v(data) -> list[Any]:
     return [x[0] for x in struct.iter_unpack('<h', data[1])]
+
+def decode_s32v(data) -> list[Any]:
+    return [x[0] for x in struct.iter_unpack('<i', data[1])]
 
 def decode(b):
     data = msgpack.unpackb(b)
@@ -110,16 +113,17 @@ def decode(b):
         return decode_null(data)
     if tp == "list":
         return decode_list(data)
-    if tp == "u8v" or tp == "i8v":
+    if tp == "u8v" or tp == "s8v":
         return decode_u8v(data)
-    if tp == "i16v":
-        return decode_i16v(data)
-
+    if tp == "s16v":
+        return decode_s16v(data)
+    if tp == "s32v":
+        return decode_s32v(data)
     return None
 
 class Frame:
     def __init__(self):
-        self._chunk_id: bytes = b"rspt"
+        self._chunk_id: bytes = b"rsp"
         self._session_id: tuple[int, int] = create_session_id()
         self._stream_id: int = 0
         self._checksum: int = 0
@@ -182,36 +186,40 @@ class Frame:
         return self._data
 
     @data.setter
-    def data(self, data: list[int]):
+    def data(self, data: bytes):
         self._data = data
         self._checksum = crc32c.crc32c(self._data)
         self._block_size = len(self._data)
 
-    def encode(self):
-        b = b""
-        b += self._chunk_id
-        b += self._session_id[0].to_bytes(8, "little")
-        b += self._session_id[1].to_bytes(8, "little")
-        b += self._stream_id.to_bytes(8, "little")
-        b += self._checksum.to_bytes(4, "little")
-        b += self._channels.to_bytes(2, "little")
-        b += self._sample_rate.to_bytes(4, "little")
-        b += self._bit_depth.to_bytes(2, "little")
-        b += self._block_size.to_bytes(2, "little")
-        b += self._data
-
-        return b
+    def encode(self) -> bytes:
+        header = struct.pack(
+            "<3sQQQ I H I H H",
+            self._chunk_id,
+            self._session_id[0],
+            self._session_id[1],
+            self._stream_id,
+            self._checksum,
+            self._channels,
+            self._sample_rate,
+            self._bit_depth,
+            self._block_size
+        )
+        return header + self._data
 
     @staticmethod
     def chunk(data, n):
         return [data[i:i + n] for i in range(0, len(data), n)]
 
     @staticmethod
-    def pack(data :list[int]) -> bytes:
-        b = b""
-        for i in data:
-            b += i.to_bytes(2, "little", signed=True)
-        return b
+    def pack(data: list[int], bit_depth) -> bytes | None:
+        if bit_depth == 16:
+            return struct.pack("<" + "h" * len(data), *data)
+        if bit_depth == 24:
+            out = bytearray()
+            for x in data:
+                out += x.to_bytes(3, "little", signed=True)
+            return bytes(out)
+        return None
 
 
 def create_session_id() -> tuple[int, int]:
@@ -222,7 +230,7 @@ class Command:
     def __init__(self, pool: SocketPool):
         self._pool = pool
 
-    def execute(self, command: str):
+    def execute_command(self, command: str):
         sock = self._pool.get()
         try:
             return decode(send(sock, command.encode() + b'\0'))
@@ -233,11 +241,11 @@ class Command:
         frame = Frame()
         frame.stream_id = info['stream_id']
         frame.sample_rate = info['sample_rate']
-        frame.bit_depth = 16
+        frame.bit_depth = info['bit_depth']
         frame.channels = info['channels']
 
         for chunk in Frame.chunk(pcm_data, info['chunk_size']):
-            frame.data = Frame.pack(chunk)
+            frame.data = Frame.pack(chunk, frame.bit_depth)
             sock = self._pool.get()
             try:
                 resp = send(sock, frame.encode())
@@ -255,12 +263,12 @@ class Pipeline(Command):
         self._commands.append(f"EXTRACT '{stream_id}' {rfc3339(frm)} {rfc3339(to)}")
         return self
 
-    def format(self, mime_type: str, channels: int, sample_rate: int):
-        self._commands.append(f"FORMAT '{mime_type}' {channels} {sample_rate}")
+    def format(self, mime_type: str, sample_rate: int, channels: int, bit_depth: int):
+        self._commands.append(f"FORMAT '{mime_type}' {sample_rate} {channels} {bit_depth}")
         return self
 
-    def create(self, stream_id: str, sample_rate: int, channels: int):
-        self._commands.append(f"CREATE '{stream_id}' {sample_rate} {channels}")
+    def create(self, stream_id: str, sample_rate: int, channels: int, bit_depth: int):
+        self._commands.append(f"CREATE '{stream_id}' {sample_rate} {channels} {bit_depth}")
         return self
 
     def info(self, stream_id: str, attr: str):
@@ -268,7 +276,7 @@ class Pipeline(Command):
         return self
 
     def list(self, pattern: str):
-        self._commands.append(f"LIST '{pattern}'")
+        self._commands.append(f"LS '{pattern}'")
         return self
 
     def open(self, stream_id: str):
@@ -291,10 +299,10 @@ class Pipeline(Command):
         self._commands.append("SHUTDOWN")
         return self
 
-    def execute_pipeline(self):
+    def execute(self):
         command = " |> ".join(self._commands)
         print(command)
-        return self.execute(command)
+        return self.execute_command(command)
 
     def reset(self):
         self._commands.clear()
