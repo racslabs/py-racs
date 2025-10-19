@@ -33,12 +33,28 @@ def unpack_u8v(data) -> bytes:
     return data[1]
 
 
-def unpack_s16v(data) -> list[Any]:
+def unpack_s16v(data) -> list[int]:
     return [x[0] for x in struct.iter_unpack('<h', data[1])]
 
 
-def unpack_s32v(data) -> list[Any]:
+def unpack_s32v(data) -> list[int]:
     return [x[0] for x in struct.iter_unpack('<i', data[1])]
+
+
+def unpack_u16v(data) -> list[int]:
+    return [x[0] for x in struct.iter_unpack('<H', data[1])]
+
+
+def unpack_u32v(data) -> list[int]:
+    return [x[0] for x in struct.iter_unpack('<I', data[1])]
+
+
+def unpack_f32(data) -> list[float]:
+    return [x[0] for x in struct.iter_unpack('<f', data[1])]
+
+
+def unpack_c64(data) -> list[complex]:
+    return [complex(r, i) for (r, i) in struct.iter_unpack('<ff', data[1])]
 
 
 def unpack_error(data):
@@ -49,6 +65,8 @@ def unpack(b):
     data = msgpack.unpackb(b)
 
     tp = data[0]
+    if tp == "bool":
+        return unpack_bool(data)
     if tp == "string":
         return unpack_str(data)
     if tp == "error":
@@ -65,6 +83,14 @@ def unpack(b):
         return unpack_u8v(data)
     if tp == "s16v":
         return unpack_s16v(data)
+    if tp == "u16v":
+        return unpack_u16v(data)
     if tp == "s32v":
         return unpack_s32v(data)
+    if tp == "u32v":
+        return unpack_u32v(data)
+    if tp == "f32v":
+        return unpack_f32(data)
+    if tp == "c64v":
+        return unpack_c64(data)
     return None

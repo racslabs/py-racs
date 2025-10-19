@@ -4,7 +4,7 @@ import socket
 from typing import Optional
 
 
-class SocketPool:
+class ConnectionPool:
 
     def __init__(self, host: str, port: int, size: int):
         self._host = host

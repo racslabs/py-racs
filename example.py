@@ -2,9 +2,9 @@ from datetime import datetime
 
 import torchaudio
 import torch
-import soundfile
+# import soundfile
 
-from racs.client import Racs
+from racs import Racs
 
 if __name__ == '__main__':
 
@@ -14,21 +14,21 @@ if __name__ == '__main__':
     #     .round() \
     #     .clamp(min=-32768, max=32767) \
     #     .int().T.ravel().tolist()
-    #
-    r = Racs("10.0.0.75", 6381)
+
+    r = Racs("localhost", 6381)
     p = r.pipeline()
 
     # print(p.info('chopin', 'bit_depth').execute())
-
+    #
     # res = p.create('chopin', 44100, 2, 16).execute()
     # print(res)
     # p.reset()
-    #
+
     # p.open('chopin')
     # res = p.execute()
     # print(res)
     # p.reset()
-    #
+
     # p.stream({
     #     'chunk_size': 1024 * 31,
     #     'sample_rate': 44100,
@@ -42,9 +42,10 @@ if __name__ == '__main__':
     #
     # d = p.extract('chopin', frm, to).format('audio/wav', 44100, 2, 16).execute()
     #
+    print(p.eval("#c32(1 2)").execute())
     # print(len(d))
-    d = p.eval("(let ((x 2) (y 4)) (* x y))").execute()
-    print(d)
+    # d = p.shutdown().execute()
+    # print(d)
     # with open("c.wav", "wb") as f:
     #     f.write(d)
 

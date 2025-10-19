@@ -1,38 +1,47 @@
-from .excpetion import RacsException
-from .socket import SocketPool, send
+from .socket import ConnectionPool, send
 from .pack import unpack
-from .frame import Frame
-from .utils import chunk, pack
+from .stream import Stream
 
 
-class Command:
-    def __init__(self, pool: SocketPool):
-        self._pool = pool
+class Command(Stream):
+    """
+    Base class for executing commands on a RACS server.
+
+    The `Command` class provides a simple abstraction for sending
+    string-based commands over a managed connection pool and
+    receiving structured responses.
+    """
+
+    def __init__(self, pool: ConnectionPool):
+        """
+        Initialize a command executor.
+
+        Parameters
+        ----------
+        pool : ConnectionPool
+            The connection pool used to manage active socket connections.
+        """
+        super().__init__(pool)
 
     def execute_command(self, command: str):
+        """
+        Execute a single command on the RACS server.
+
+        This method acquires a socket from the pool, sends the command,
+        waits for a response, and then returns the connection to the pool.
+
+        Parameters
+        ----------
+        command : str
+            The command string to send to the server.
+
+        Returns
+        -------
+        Any
+            The unpacked server response.
+        """
         sock = self._pool.get()
         try:
             return unpack(send(sock, command.encode() + b'\0'))
         finally:
             self._pool.put(sock)
-
-    def stream(self, info, pcm_data: list[int]) -> None:
-        frame = Frame()
-        frame.stream_id = info['stream_id']
-        frame.sample_rate = info['sample_rate']
-        frame.bit_depth = info['bit_depth']
-        frame.channels = info['channels']
-
-        chunk_size = info['chunk_size']
-        if chunk_size < 0 or chunk_size > 0xffff:
-            raise RacsException("'chunk_size' must be >= 0 or <= 0xffff")
-
-        n = chunk_size // (frame.bit_depth // 8)
-        for _chunk in chunk(pcm_data, n):
-            frame.data = pack(_chunk, frame.bit_depth)
-            sock = self._pool.get()
-            try:
-                resp = send(sock, frame.encode())
-                unpack(resp)
-            finally:
-                self._pool.put(sock)
