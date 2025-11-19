@@ -1,9 +1,10 @@
 from .pipeline import Pipeline
 from .socket import ConnectionPool
 from .command import Command
+from .stream import Stream
 
 
-class Racs(Command):
+class Racs(Command, Stream):
     """
     High-level client interface for interacting with the RACS server.
 

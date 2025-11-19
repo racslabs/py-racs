@@ -1,3 +1,4 @@
+from .command import Command
 from .pack import unpack
 from .excpetion import RacsException
 from .frame import Frame
@@ -25,19 +26,16 @@ class Stream:
         """
         self._pool = pool
 
-    def stream(self, info: dict, pcm_data: list[int]) -> None:
+    def stream(self, stream_id: str, chunk_size: int, pcm_data: list[int]) -> None:
         """
         Send raw PCM samples as RACS frames.
 
         Parameters
         ----------
-        info : dict
-            Dictionary containing stream metadata:
-            - 'stream_id': str, unique identifier of the stream
-            - 'sample_rate': int, samples per second in Hz
-            - 'bit_depth': int, bits per sample (16 or 24)
-            - 'channels': int, number of audio channels
-            - 'chunk_size': int, size of each PCM block in bytes (max 65535)
+        stream_id : str
+            Unique identifier of the stream. ASCII string.
+        chunk_size :
+            Size of pcm block in bytes. Must be >= 0 or <= 0xffff.
         pcm_data : list[int]
             Raw PCM samples interleaved by channel.
 
@@ -46,20 +44,19 @@ class Stream:
         RacsException
             If `chunk_size` is negative or exceeds 0xffff.
         """
-        frame = Frame()
-        frame.stream_id = info['stream_id']
-        frame.sample_rate = info['sample_rate']
-        frame.bit_depth = info['bit_depth']
-        frame.channels = info['channels']
+        command = Command(self._pool)
+        bit_depth = command.execute_command(f"INFO '{stream_id}' 'bit_depth'")
 
-        chunk_size = info['chunk_size']
+        frame = Frame()
+        frame.stream_id = stream_id
+
         if chunk_size < 0 or chunk_size > 0xffff:
             raise RacsException("'chunk_size' must be >= 0 or <= 0xffff")
 
-        n = chunk_size // (frame.bit_depth // 8)
+        n = chunk_size // (bit_depth // 8)
 
         for _chunk in chunk(pcm_data, n):
-            frame.data = pack(_chunk, frame.bit_depth)
+            frame.data = pack(_chunk, bit_depth)
             sock = self._pool.get()
             try:
                 resp = send(sock, frame.pack())

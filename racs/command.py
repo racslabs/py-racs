@@ -1,9 +1,8 @@
 from .socket import ConnectionPool, send
 from .pack import unpack
-from .stream import Stream
 
 
-class Command(Stream):
+class Command:
     """
     Base class for executing commands on a RACS server.
 
@@ -21,7 +20,7 @@ class Command(Stream):
         pool : ConnectionPool
             The connection pool used to manage active socket connections.
         """
-        super().__init__(pool)
+        self._pool = pool
 
     def execute_command(self, command: str):
         """
