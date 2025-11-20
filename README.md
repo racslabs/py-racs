@@ -1,12 +1,18 @@
 # py-racs
 
-[![crates.io](https://img.shields.io/crates/v/racs.svg)](https://crates.io/crates/racs)
+![PyPI - Version](https://img.shields.io/pypi/v/:packageName)
+
 
 **py-racs** is the python client library for [RACS](https://github.com/racslabs/racs). 
 It provides access to all the RACS commands through a low-level API.
 
 
 ## Installation
+
+PyPi account is not yet setup. For now, installation can be done by cloning the repo and running the following in project root:
+```commandline
+pip install <path to project root>
+```
 
 ## Basic Operations
 
@@ -34,8 +40,8 @@ r = Racs(host="localhost", port=6381, pool_size=3)
 p = r.pipeline()
 
 # Create a new audio stream and open it using pipeline
-res = p.create(stream_id="chopin", sample_rate=44100, channels=2, bit_depth=16) \
-       .open(stream_id="chopin") \
+res = p.create(stream_id="Beethoven Piano Sonata No.1", sample_rate=44100, channels=2, bit_depth=16) \
+       .open(stream_id="Beethoven Piano Sonata No.1") \
        .execute()
 
 # Reset pipeline
@@ -45,10 +51,10 @@ p.reset()
 data = [...]
 
 # // Stream PCM data to the server
-r.stream(stream_id="chopin", chunk_size=1024 * 32, pcm_data=data)
+r.stream(stream_id="Beethoven Piano Sonata No.1", chunk_size=1024 * 32, pcm_data=data)
 
 # Close the stream when finished
-p.close(stream_id="chopin") \
+p.close(stream_id="Beethoven Piano Sonata No.1") \
  .execute()
 ```
 
@@ -67,7 +73,7 @@ r = Racs(host="localhost", port=6381, pool_size=3)
 p = r.pipeline()
 
 # Get the reference timestamp (in milliseconds)
-ref = p.info(stream_id="chopin", attr="ref") \
+ref = p.info(stream_id="Beethoven Piano Sonata No.1", attr="ref") \
        .execute()
 
 # Convert milliseconds to datetime
@@ -77,20 +83,20 @@ to = frm + timedelta(days=1)
 
 # Extract PCM data between `frm` and `to`
 # Convert (format) the audio to MP3
-res = p.extract(stream_id="chopin", frm=frm, to=to) \
+res = p.extract(stream_id="Beethoven Piano Sonata No.1", frm=frm, to=to) \
        .format(mime_type="audio/mp3", sample_rate=44100, channels=2, bit_depth=16) \
        .execute()
 
 # Use or save the MP3 bytes
 # e.g. write them to a file
-with open("chopin.mp3", "wb") as f:
+with open("beethoven.mp3", "wb") as f:
     f.write(res)
 ```
 
 To extract PCM data without formating, do the following instead:
 
 ```python
-res = p.extract(stream_id="chopin", frm=frm, to=to) \
+res = p.extract(stream_id="Beethoven Piano Sonata No.1", frm=frm, to=to) \
        .execute()
 ```
 
@@ -128,7 +134,7 @@ r = Racs(host="localhost", port=6381, pool_size=3)
 p = r.pipeline()
 
 # Get sample rate attribute for stream
-res = p.info(stream_id="chopin", attr="sample_rate").execute()
+res = p.info(stream_id="Beethoven Piano Sonata No.1", attr="sample_rate").execute()
 
 # Print the sample rate
 print(res) # 44100
