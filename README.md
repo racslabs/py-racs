@@ -102,8 +102,8 @@ res = p.extract(stream_id="Beethoven Piano Sonata No.1", frm=frm, to=to) \
 
 ### Querying Streams and Metadata
 
-Stream ids stored in RACS can be queried using the ``list`` function.
-``list`` takes a glob pattern and returns a list of streams ids matching the pattern.
+Stream ids stored in RACS can be queried using the ``search`` function.
+``search`` takes a glob pattern and returns a list of streams ids matching the pattern.
 
 ```python
 from racs import Racs
