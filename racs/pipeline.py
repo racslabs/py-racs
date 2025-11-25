@@ -127,13 +127,13 @@ class Pipeline(Command):
         self._commands.append(f"INFO '{stream_id}' '{attr}'")
         return self
 
-    def list(self, pattern: str):
+    def search(self, pattern: str):
         """
         Append an LS command to the pipeline.
 
         Command String Example
         ----------------------
-        LS 'vocals*'
+        SEARCH 'vocals*'
 
         Parameters
         ----------
@@ -145,7 +145,7 @@ class Pipeline(Command):
         Pipeline
             The current pipeline instance (for chaining).
         """
-        self._commands.append(f"LS '{pattern}'")
+        self._commands.append(f"SEARCH '{pattern}'")
         return self
 
     def open(self, stream_id: str):

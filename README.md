@@ -115,7 +115,7 @@ r = Racs(host="localhost", port=6381, pool_size=3)
 p = r.pipeline()
 
 # Run list command matching "*" pattern
-res = p.list(pattern="*").execute()
+res = p.search(pattern="*").execute()
 
 # ['Beethoven Piano Sonata No.1']
 print(res)
