@@ -25,7 +25,7 @@ class Pipeline(Command):
         super().__init__(pool)
         self._commands = []
 
-    def extract(self, stream_id: str, frm: datetime, to: datetime):
+    def extract(self, stream_id: str, start: float, duration: float):
         """
         Append an EXTRACT command to the pipeline.
 
@@ -37,17 +37,17 @@ class Pipeline(Command):
         ----------
         stream_id : str
             Identifier of the target stream. ASCII only.
-        frm : datetime
-            Start time in RFC 3339 format.
-        to : datetime
-            End time in RFC 3339 format.
+        start : float
+            Start time (in seconds) to extract from stream.
+        duration : float
+            Duration of audio segment to extract from stream.
 
         Returns
         -------
         Pipeline
             The current pipeline instance (for chaining).
         """
-        self._commands.append(f"EXTRACT '{stream_id}' {rfc3339(frm)} {rfc3339(to)}")
+        self._commands.append(f"EXTRACT '{stream_id}' {start} {duration}")
         return self
 
     def format(self, mime_type: str, sample_rate: int, channels: int, bit_depth: int):

@@ -105,6 +105,10 @@ class Frame:
         self._checksum = crc32c.crc32c(self._data)
         self._block_size = len(self._data)
 
+    @flags.setter
+    def flags(self, flag: bool):
+        self._flags = 1 if flag else 0
+
     def pack(self) -> bytes:
         """
         Pack the frame into its binary representation.
