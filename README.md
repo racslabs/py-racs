@@ -16,12 +16,12 @@ pip install <path to project root>
 
 ## Basic Operations
 
-To open a connection, simply create a client using ``open``. 
+To open a connection, simply create a new ``Racs`` instance and provide the host and port.
 
 ```python
 from racs import Racs
 
-r = Racs(host="localhost", port=6381, pool_size=3)
+r = Racs(host="localhost", port=6381)
 ```
 
 ### Streaming
@@ -34,7 +34,7 @@ and streamed to the RACS server.
 from racs import Racs
 
 # Connect to the RACS server
-r = Racs(host="localhost", port=6381, pool_size=3)
+r = Racs(host="localhost", port=6381)
 
 # Get pipeline
 p = r.pipeline()
@@ -59,31 +59,21 @@ p.close(stream_id="Beethoven Piano Sonata No.1") \
 ```
 
 ### Extracting and Formating
-The below example retrieves a reference timestamp, and uses it to extract an audio segment based on the given range. 
-It then converts the extracted PCM data into MP3 format and writes the resulting bytes to a file.
+The below example extracts a 30-second audio segment. It then converts the extracted PCM data into MP3 format and writes the resulting bytes to a file.
 
 ```python
 from racs import Racs
 from datetime import datetime, timezone,  timedelta
 
 # Connect to the RACS server
-r = Racs(host="localhost", port=6381, pool_size=3)
+r = Racs(host="localhost", port=6381)
 
 # Get pipeline
 p = r.pipeline()
 
-# Get the reference timestamp (in milliseconds)
-ref = p.info(stream_id="Beethoven Piano Sonata No.1", attr="ref") \
-       .execute()
-
-# Convert milliseconds to datetime
-frm = datetime.fromtimestamp(ref / 1000, tz=timezone.utc)
-# Compute end time by adding one day
-to = frm + timedelta(days=1)
-
-# Extract PCM data between `frm` and `to`
+# Extract PCM data
 # Convert (format) the audio to MP3
-res = p.extract(stream_id="Beethoven Piano Sonata No.1", frm=frm, to=to) \
+res = p.extract(stream_id="Beethoven Piano Sonata No.1", start=0.0, duration=30.0) \
        .format(mime_type="audio/mp3", sample_rate=44100, channels=2, bit_depth=16) \
        .execute()
 
@@ -96,7 +86,7 @@ with open("beethoven.mp3", "wb") as f:
 To extract PCM data without formating, do the following instead:
 
 ```python
-res = p.extract(stream_id="Beethoven Piano Sonata No.1", frm=frm, to=to) \
+res = p.extract(stream_id="Beethoven Piano Sonata No.1", start=0.0, duration=30.0) \
        .execute()
 ```
 
