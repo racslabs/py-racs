@@ -51,7 +51,7 @@ class Stream:
           If `chunk_size` is negative or exceeds 0xffff.
         """
         command = Command(self._pool)
-        bit_depth = command.execute_command(f"INFO '{stream_id}' 'bit_depth'")
+        bit_depth = command.execute_command(f"META '{stream_id}' 'bit_depth'")
 
         if chunk_size < 0 or chunk_size > 0xffff:
             raise RacsException("'chunk_size' must be >= 0 or <= 0xffff")
@@ -119,7 +119,7 @@ class Stream:
             If `chunk_size` is negative or exceeds 0xffff.
         """
         command = Command(self._pool)
-        bit_depth = command.execute_command(f"INFO '{stream_id}' 'bit_depth'")
+        bit_depth = command.execute_command(f"META '{stream_id}' 'bit_depth'")
 
         frame = Frame()
         frame.stream_id = stream_id

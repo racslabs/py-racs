@@ -25,13 +25,13 @@ class Pipeline(Command):
         super().__init__(pool)
         self._commands = []
 
-    def extract(self, stream_id: str, start: float, duration: float):
+    def range(self, stream_id: str, start: float, duration: float):
         """
-        Append an EXTRACT command to the pipeline.
+        Append an RANGE command to the pipeline.
 
         Command String Example
         ----------------------
-        EXTRACT 'vocals' 2025-10-18T12:00:00Z 2025-10-18T12:05:00Z
+        RANGE 'vocals' 0.0 30.0
 
         Parameters
         ----------
@@ -47,16 +47,16 @@ class Pipeline(Command):
         Pipeline
             The current pipeline instance (for chaining).
         """
-        self._commands.append(f"EXTRACT '{stream_id}' {start} {duration}")
+        self._commands.append(f"RANGE '{stream_id}' {start} {duration}")
         return self
 
-    def format(self, mime_type: str, sample_rate: int, channels: int, bit_depth: int):
+    def encode(self, mime_type: str, sample_rate: int, channels: int, bit_depth: int):
         """
-        Append a FORMAT command to the pipeline.
+        Append a ENCODE command to the pipeline.
 
         Command String Example
         ----------------------
-        FORMAT 'audio/wav' 48000 2 16
+        ENCODE 'audio/wav' 48000 2 16
 
         Parameters
         ----------
@@ -74,7 +74,7 @@ class Pipeline(Command):
         Pipeline
             The current pipeline instance (for chaining).
         """
-        self._commands.append(f"FORMAT '{mime_type}' {sample_rate} {channels} {bit_depth}")
+        self._commands.append(f"ENCODE '{mime_type}' {sample_rate} {channels} {bit_depth}")
         return self
 
     def create(self, stream_id: str, sample_rate: int, channels: int, bit_depth: int):
@@ -104,13 +104,13 @@ class Pipeline(Command):
         self._commands.append(f"CREATE '{stream_id}' {sample_rate} {channels} {bit_depth}")
         return self
 
-    def info(self, stream_id: str, attr: str):
+    def meta(self, stream_id: str, attr: str):
         """
-        Append an INFO command to the pipeline.
+        Append an META command to the pipeline.
 
         Command String Example
         ----------------------
-        INFO 'vocals' 'size'
+        META 'vocals' 'size'
 
         Parameters
         ----------
@@ -124,16 +124,16 @@ class Pipeline(Command):
         Pipeline
             The current pipeline instance (for chaining).
         """
-        self._commands.append(f"INFO '{stream_id}' '{attr}'")
+        self._commands.append(f"META '{stream_id}' '{attr}'")
         return self
 
-    def search(self, pattern: str):
+    def list(self, pattern: str):
         """
-        Append an LS command to the pipeline.
+        Append an LIST command to the pipeline.
 
         Command String Example
         ----------------------
-        SEARCH 'vocals*'
+        LIST 'vocals*'
 
         Parameters
         ----------
@@ -145,7 +145,7 @@ class Pipeline(Command):
         Pipeline
             The current pipeline instance (for chaining).
         """
-        self._commands.append(f"SEARCH '{pattern}'")
+        self._commands.append(f"LIST '{pattern}'")
         return self
 
     def open(self, stream_id: str):
@@ -249,7 +249,7 @@ class Pipeline(Command):
 
         Command String Example
         ----------------------
-        EXTRACT 'vocals' 2025-10-18T12:00:00Z 2025-10-18T12:05:00Z |> FORMAT 'audio/wav' 48000 2 16
+        RANGE 'vocals' 0.0 30.0 |> ENCODE 'audio/wav' 48000 2 16
 
         Returns
         -------
