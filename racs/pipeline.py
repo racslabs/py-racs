@@ -2,7 +2,6 @@ from datetime import datetime
 
 from .socket import ConnectionPool
 from .command import Command
-from .utils import rfc3339
 
 class Pipeline(Command):
     """
@@ -24,6 +23,34 @@ class Pipeline(Command):
         """
         super().__init__(pool)
         self._commands = []
+
+    def gain(self, gain: float):
+        self._commands.append(f"GAIN {float(gain)}")
+        return self
+
+    def trim(self, left: float, right: float):
+        self._commands.append(f"TRIM {float(left)} {float(right)}")
+        return self
+
+    def fade(self, in_sec: float, out_sec: float):
+        self._commands.append(f"FADE {float(in_sec)} {float(out_sec)}")
+        return self
+
+    def pan(self, pan: float):
+        self._commands.append(f"PAN {float(pan)}")
+        return self
+
+    def pad(self, left: float, right: float):
+        self._commands.append(f"PAD {float(left)} {float(right)}")
+        return self
+
+    def clip(self, min_val: int, max_val: int):
+        self._commands.append(f"CLIP {min_val} {max_val}")
+        return self
+
+    def split(self, channel: int):
+        self._commands.append(f"SPLIT {channel}")
+        return self
 
     def range(self, stream_id: str, start: float, duration: float):
         """
@@ -47,34 +74,28 @@ class Pipeline(Command):
         Pipeline
             The current pipeline instance (for chaining).
         """
-        self._commands.append(f"RANGE '{stream_id}' {start} {duration}")
+        self._commands.append(f"RANGE '{stream_id}' {float(start)} {float(duration)}")
         return self
 
-    def encode(self, mime_type: str, sample_rate: int, channels: int, bit_depth: int):
+    def encode(self, mime_type: str):
         """
         Append a ENCODE command to the pipeline.
 
         Command String Example
         ----------------------
-        ENCODE 'audio/wav' 48000 2 16
+        ENCODE 'audio/wav'
 
         Parameters
         ----------
         mime_type : str
             MIME type of the output (e.g., "audio/wav").
-        sample_rate : int
-            Sample rate in Hz.
-        channels : int
-            Number of audio channels.
-        bit_depth : int
-            Bits per sample.
 
         Returns
         -------
         Pipeline
             The current pipeline instance (for chaining).
         """
-        self._commands.append(f"ENCODE '{mime_type}' {sample_rate} {channels} {bit_depth}")
+        self._commands.append(f"ENCODE '{mime_type}'")
         return self
 
     def create(self, stream_id: str, sample_rate: int, channels: int, bit_depth: int):
@@ -249,7 +270,7 @@ class Pipeline(Command):
 
         Command String Example
         ----------------------
-        RANGE 'vocals' 0.0 30.0 |> ENCODE 'audio/wav' 48000 2 16
+        RANGE 'vocals' 0.0 30.0 |> ENCODE 'audio/wav'
 
         Returns
         -------
@@ -257,6 +278,7 @@ class Pipeline(Command):
             The unpacked response from the RACS server.
         """
         command = " |> ".join(self._commands)
+        print(command)
         return self.execute_command(command)
 
     def reset(self):
