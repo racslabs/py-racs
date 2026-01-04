@@ -34,7 +34,7 @@ p = r.pipeline()
 
 # Create a new audio stream and open it using pipeline
 res = p.create(stream_id="vocals", sample_rate=44100, channels=2, bit_depth=16) \
-       .open(stream_id="vocal") \
+       .open(stream_id="vocals") \
        .execute()
 
 # Reset pipeline
@@ -103,7 +103,7 @@ Stream metadata can be retrieved using the ``meta`` command.
 from racs import Racs
 
 # Connect to the RACS server
-r = Racs(host="localhost", port=6381, pool_size=3)
+r = Racs(host="localhost", port=6381)
 
 # Get pipeline
 p = r.pipeline()
@@ -123,7 +123,6 @@ The supported metadata attributes are:
 | `sample_rate`   | Sample rate of the audio stream (Hz).      |
 | `bit_depth`     | Bit depth of the audio stream.             |
 | `ref`           | Reference timestamp (milliseconds UTC).    |
-| `size`          | Size of audio stream in bytes.             |
 
 ### Raw Command Execution
 
