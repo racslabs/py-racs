@@ -56,7 +56,6 @@ The below example extracts a 30-second PCM audio segment using the ``range`` com
 
 ```python
 from racs import Racs
-from datetime import datetime, timezone,  timedelta
 
 # Connect to the RACS server
 r = Racs(host="localhost", port=6381)
