@@ -7,13 +7,6 @@
 It provides access to all the RACS commands through a low-level API.
 
 
-## Installation
-
-PyPi account is not yet setup. For now, installation can be done by cloning the repo and running the following in project root:
-```commandline
-pip install <path to project root>
-```
-
 ## Basic Operations
 
 To open a connection, simply create a new ``Racs`` instance and provide the host and port.
@@ -40,8 +33,8 @@ r = Racs(host="localhost", port=6381)
 p = r.pipeline()
 
 # Create a new audio stream and open it using pipeline
-res = p.create(stream_id="Beethoven Piano Sonata No.1", sample_rate=44100, channels=2, bit_depth=16) \
-       .open(stream_id="Beethoven Piano Sonata No.1") \
+res = p.create(stream_id="vocals", sample_rate=44100, channels=2, bit_depth=16) \
+       .open(stream_id="vocal") \
        .execute()
 
 # Reset pipeline
@@ -51,15 +44,15 @@ p.reset()
 data = [...]
 
 # // Stream PCM data to the server
-r.stream(stream_id="Beethoven Piano Sonata No.1", chunk_size=1024 * 32, pcm_data=data)
+r.stream(stream_id="vocals", chunk_size=1024 * 32, pcm_data=data)
 
 # Close the stream when finished
-p.close(stream_id="Beethoven Piano Sonata No.1") \
+p.close(stream_id="vocals") \
  .execute()
 ```
 
 ### Extracting and Formating
-The below example extracts a 30-second audio segment. It then converts the extracted PCM data into MP3 format and writes the resulting bytes to a file.
+The below example extracts a 30-second PCM audio segment using the ``range`` command. It then encodes the data to MP3 and writes the resulting bytes to a file.
 
 ```python
 from racs import Racs
@@ -72,47 +65,39 @@ r = Racs(host="localhost", port=6381)
 p = r.pipeline()
 
 # Extract PCM data
-# Convert (format) the audio to MP3
-res = p.extract(stream_id="Beethoven Piano Sonata No.1", start=0.0, duration=30.0) \
-       .format(mime_type="audio/mp3", sample_rate=44100, channels=2, bit_depth=16) \
+# Encode the audio to MP3
+res = p.range(stream_id="vocals", start=0.0, duration=30.0) \
+       .encode(mime_type="audio/mp3") \
        .execute()
 
-# Use or save the MP3 bytes
-# e.g. write them to a file
-with open("beethoven.mp3", "wb") as f:
+# Write to a file
+with open("vocals.mp3", "wb") as f:
     f.write(res)
-```
-
-To extract PCM data without formating, do the following instead:
-
-```python
-res = p.extract(stream_id="Beethoven Piano Sonata No.1", start=0.0, duration=30.0) \
-       .execute()
 ```
 
 ### Querying Streams and Metadata
 
-Stream ids stored in RACS can be queried using the ``search`` function.
-``search`` takes a glob pattern and returns a list of streams ids matching the pattern.
+Stream ids stored in RACS can be queried using the ``list`` function.
+``list`` takes a glob pattern and returns a list of streams ids matching the pattern.
 
 ```python
 from racs import Racs
 
 # Connect to the RACS server
-r = Racs(host="localhost", port=6381, pool_size=3)
+r = Racs(host="localhost", port=6381)
 
 # Get pipeline
 p = r.pipeline()
 
 # Run list command matching "*" pattern
-res = p.search(pattern="*").execute()
+res = p.list(pattern="*").execute()
 
-# ['Beethoven Piano Sonata No.1']
+# ['vocals']
 print(res)
 ```
 
-Stream metadata can be queried using the ``info`` function. 
-``info`` takes the stream id and metadata attribute as parameters.
+Stream metadata can be retrieved using the ``meta`` command. 
+``meta`` takes the stream id and metadata attribute as parameters.
 
 ```python
 from racs import Racs
@@ -124,13 +109,13 @@ r = Racs(host="localhost", port=6381, pool_size=3)
 p = r.pipeline()
 
 # Get sample rate attribute for stream
-res = p.info(stream_id="Beethoven Piano Sonata No.1", attr="sample_rate").execute()
+res = p.meta(stream_id="vocals", attr="sample_rate").execute()
 
 # Print the sample rate
 print(res) # 44100
 ```
 
-The supported attributes are:
+The supported metadata attributes are:
 
 | Attribute       | Description                                |
 |-----------------|--------------------------------------------|
@@ -147,7 +132,7 @@ To execute raw command strings, use the ``execute_command`` function.
 ```python
 from racs import Racs
 
-r = Racs(host="localhost", port=6381, pool_size=3)
+r = Racs(host="localhost", port=6381)
 
 res = r.execute_command("EVAL '(+ 1 2 3)'")
 ```
