@@ -28,7 +28,7 @@ class Stream:
         """
         self._pool = pool
 
-    def stream(self, stream_id: str, chunk_size: int, pcm_data: list[int], batch_size: int = 1, compressed: bool = False):
+    def stream(self, stream_id: str, chunk_size: int, pcm_data: list[int], batch_size: int = 50, compressed: bool = True):
         """
         Send raw PCM samples as RACS frames.
 
@@ -44,6 +44,8 @@ class Stream:
           Number of frames to send in each batch.
         compressed : bool
           Compression flag.
+        level : int
+          Level of compression.
 
         Raises
         ------

@@ -51,7 +51,25 @@ p.close(stream_id="vocals") \
  .execute()
 ```
 
-### Extracting and Formating
+Stream ids stored in RACS can be queried using the ``list`` command. ``list`` takes a glob pattern and returns a list of streams ids matching the pattern.
+
+```python
+from racs import Racs
+
+# Connect to the RACS server
+r = Racs(host="localhost", port=6381)
+
+# Get pipeline
+p = r.pipeline()
+
+# Run list command matching "*" pattern
+res = p.list(pattern="*").execute()
+
+# ['vocals']
+print(res)
+```
+
+### Extracting Audio
 The below example extracts a 30-second PCM audio segment using the ``range`` command. It then encodes the data to MP3 and writes the resulting bytes to a file.
 
 ```python
@@ -74,29 +92,9 @@ with open("vocals.mp3", "wb") as f:
     f.write(res)
 ```
 
-### Querying Streams and Metadata
+### Metadata
 
-Stream ids stored in RACS can be queried using the ``list`` function.
-``list`` takes a glob pattern and returns a list of streams ids matching the pattern.
-
-```python
-from racs import Racs
-
-# Connect to the RACS server
-r = Racs(host="localhost", port=6381)
-
-# Get pipeline
-p = r.pipeline()
-
-# Run list command matching "*" pattern
-res = p.list(pattern="*").execute()
-
-# ['vocals']
-print(res)
-```
-
-Stream metadata can be retrieved using the ``meta`` command. 
-``meta`` takes the stream id and metadata attribute as parameters.
+Stream metadata can be retrieved using the ``meta`` command. ``meta`` takes the stream id and metadata attribute as parameters.
 
 ```python
 from racs import Racs
@@ -116,12 +114,13 @@ print(res) # 44100
 
 The supported metadata attributes are:
 
-| Attribute       | Description                                |
-|-----------------|--------------------------------------------|
-| `channels`      | Channel count of the audio stream.         |
-| `sample_rate`   | Sample rate of the audio stream (Hz).      |
-| `bit_depth`     | Bit depth of the audio stream.             |
-| `ref`           | Reference timestamp (milliseconds UTC).    |
+| Attribute     | Description                             |
+|---------------|-----------------------------------------|
+| `channels`    | Channel count of the audio stream.      |
+| `sample_rate` | Sample rate of the audio stream (Hz).   |
+| `bit_depth`   | Bit depth of the audio stream.          |
+| `ref`         | Reference timestamp (milliseconds UTC). |
+| `size`        | Size of the audio stream in bytes.      |
 
 ### Raw Command Execution
 
