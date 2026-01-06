@@ -32,10 +32,8 @@ r = Racs(host="localhost", port=6381)
 # Get pipeline
 p = r.pipeline()
 
-# Create a new audio stream and open it using pipeline
-res = p.create(stream_id="vocals", sample_rate=44100, channels=2, bit_depth=16) \
-       .open(stream_id="vocals") \
-       .execute()
+# Create a new audio stream using pipeline
+p.create(stream_id="vocals", sample_rate=44100, channels=2, bit_depth=16).execute() 
 
 # Reset pipeline
 p.reset()
@@ -44,11 +42,18 @@ p.reset()
 data = [...]
 
 # // Stream PCM data to the server
-r.stream(stream_id="vocals", chunk_size=1024 * 32, pcm_data=data)
+r.stream("vocals") \
+    .chunk_size(1024 * 32) \ 
+    .batch_size(50) \
+    .compression(True) \
+    .compression_level(8) \
+    .execute(data)
+```
+If `chunk_size`, `batch_size`, `compression` and `compression_level` are not provided, the default values will be used.
 
-# Close the stream when finished
-p.close(stream_id="vocals") \
- .execute()
+```python
+# // Stream PCM data to the server
+r.stream("vocals").execute(data)
 ```
 
 Stream ids stored in RACS can be queried using the ``list`` command. ``list`` takes a glob pattern and returns a list of streams ids matching the pattern.

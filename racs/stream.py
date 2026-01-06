@@ -8,6 +8,11 @@ import zstandard as zstd
 import msgpack
 
 
+DEFAULT_CHUNK_SIZE = 1024 * 32
+DEFAULT_BATCH_SIZE = 50
+DEFAULT_COMPRESSION_LEVEL = 3
+
+
 class Stream:
     """
     Base class for sending audio data to the RACS server.
@@ -17,7 +22,7 @@ class Stream:
     sending them over a connection pool.
     """
 
-    def __init__(self, pool: ConnectionPool):
+    def __init__(self, pool: ConnectionPool, stream_id: str):
         """
         Initialize a new Stream instance.
 
@@ -27,8 +32,43 @@ class Stream:
             Pool used to manage socket connections to the RACS server.
         """
         self._pool = pool
+        self._stream_id : str = stream_id
+        self._chunk_size : int = DEFAULT_CHUNK_SIZE
+        self._batch_size : int = DEFAULT_BATCH_SIZE
+        self._compression : bool = True
+        self._compression_level : int = DEFAULT_COMPRESSION_LEVEL
 
-    def stream(self, stream_id: str, chunk_size: int, pcm_data: list[int], batch_size: int = 50, compressed: bool = True):
+    def stream_id(self, stream_id: str):
+        self._stream_id = stream_id
+        return self
+
+    def chunk_size(self, chunk_size: int):
+        self._chunk_size = chunk_size
+        return self
+
+    def batch_size(self, batch_size: int):
+        self._batch_size = batch_size
+        return self
+
+    def compression(self, compression: bool):
+        self._compression = compression
+        return self
+
+    def compression_level(self, compression_level: int):
+        self._compression_level = compression_level
+        return self
+
+    def execute(self, data: list[int]):
+        self._stream(
+            self._stream_id,
+            self._chunk_size,
+            data,
+            self._batch_size,
+            self._compression,
+            self._compression_level
+        )
+
+    def _stream(self, stream_id: str, chunk_size: int, pcm_data: list[int], batch_size: int, compression: bool, compression_level: int):
         """
         Send raw PCM samples as RACS frames.
 
@@ -42,9 +82,9 @@ class Stream:
           Raw PCM samples interleaved by channel.
         batch_size : int
           Number of frames to send in each batch.
-        compressed : bool
+        compression : bool
           Compression flag.
-        level : int
+        compression_level : int
           Level of compression.
 
         Raises
@@ -55,14 +95,16 @@ class Stream:
         command = Command(self._pool)
         bit_depth = command.execute_command(f"META '{stream_id}' 'bit_depth'")
 
+        command.execute_command(f"OPEN '{stream_id}'")
+
         if chunk_size < 0 or chunk_size > 0xffff:
             raise RacsException("'chunk_size' must be >= 0 or <= 0xffff")
 
         frame = Frame()
         frame.stream_id = stream_id
-        frame.flags = compressed
+        frame.flags = compression
 
-        cctx = zstd.ZstdCompressor()
+        cctx = zstd.ZstdCompressor(level=compression_level)
 
         n = chunk_size // (bit_depth // 8)
         frames = []
@@ -87,7 +129,7 @@ class Stream:
         for chunk_ in chunk(pcm_data, n):
             data = pack(chunk_, bit_depth)
 
-            if compressed:
+            if compression:
                 frame.data = cctx.compress(data)
             else:
                 frame.data = data
@@ -98,3 +140,4 @@ class Stream:
                 flush()
 
         flush()
+        command.execute_command(f"CLOSE '{stream_id}'")
