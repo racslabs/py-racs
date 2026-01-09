@@ -3,9 +3,7 @@
 ![PyPI - Version](https://img.shields.io/pypi/v/:packageName)
 
 
-**py-racs** is the python client library for [RACS](https://github.com/racslabs/racs). 
-It provides access to all the RACS commands through a low-level API.
-
+**py-racs** is the python client library for [RACS](https://github.com/racslabs/racs).
 
 ## Basic Operations
 
