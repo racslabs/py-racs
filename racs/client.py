@@ -4,7 +4,7 @@ from .command import Command
 from .stream import Stream
 
 
-class Racs(Command, Stream):
+class Racs(Command):
     """
     High-level client interface for interacting with the RACS server.
 
@@ -35,6 +35,9 @@ class Racs(Command, Stream):
         Pipeline
             A :class:`Pipeline` instance allows composing multiple RACS server
             commands into a single executable sequence. Commands are joined using
-            the pipe operator (`|>`) and executed as one compound command.
+            the pipe operator (`|>`) and executed sequentially.
         """
         return Pipeline(self._pool)
+
+    def stream(self, stream_id):
+        return Stream(self._pool, stream_id)

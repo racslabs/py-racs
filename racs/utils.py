@@ -63,23 +63,3 @@ def session_id() -> bytes:
     """
     return uuid.uuid4().bytes_le
 
-
-def rfc3339(dt: datetime) -> str:
-    """
-    Convert a datetime object to an RFC 3339-compliant string (UTC).
-
-    The output includes milliseconds and ends with 'Z' to indicate UTC.
-
-    Parameters
-    ----------
-    dt : datetime
-        The datetime object to format.
-
-    Returns
-    -------
-    str
-        The RFC 3339 formatted timestamp.
-    """
-    return dt.astimezone(timezone.utc)\
-        .isoformat(timespec='milliseconds')\
-        .replace('+00:00', 'Z')

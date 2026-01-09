@@ -1,27 +1,25 @@
 # py-racs
 
-![PyPI - Version](https://img.shields.io/pypi/v/:packageName)
+[![PyPI - Version](https://img.shields.io/pypi/v/racs)](https://pypi.org/project/racs/)
 
-
-**py-racs** is the python client library for [RACS](https://github.com/racslabs/racs). 
-It provides access to all the RACS commands through a low-level API.
-
+**py-racs** is the python client library for [RACS](https://github.com/racslabs/racs).
 
 ## Installation
 
-PyPi account is not yet setup. For now, installation can be done by cloning the repo and running the following in project root:
-```commandline
-pip install <path to project root>
+To install py-racs run:
+
+```bash
+pip install racs
 ```
 
 ## Basic Operations
 
-To open a connection, simply create a client using ``open``. 
+To open a connection, simply create a new ``Racs`` instance and provide the host and port.
 
 ```python
 from racs import Racs
 
-r = Racs(host="localhost", port=6381, pool_size=3)
+r = Racs(host="localhost", port=6381)
 ```
 
 ### Streaming
@@ -34,15 +32,13 @@ and streamed to the RACS server.
 from racs import Racs
 
 # Connect to the RACS server
-r = Racs(host="localhost", port=6381, pool_size=3)
+r = Racs(host="localhost", port=6381)
 
 # Get pipeline
 p = r.pipeline()
 
-# Create a new audio stream and open it using pipeline
-res = p.create(stream_id="Beethoven Piano Sonata No.1", sample_rate=44100, channels=2, bit_depth=16) \
-       .open(stream_id="Beethoven Piano Sonata No.1") \
-       .execute()
+# Create a new audio stream using pipeline
+p.create(stream_id="vocals", sample_rate=44100, channels=2, bit_depth=16).execute() 
 
 # Reset pipeline
 p.reset()
@@ -51,104 +47,90 @@ p.reset()
 data = [...]
 
 # // Stream PCM data to the server
-r.stream(stream_id="Beethoven Piano Sonata No.1", chunk_size=1024 * 32, pcm_data=data)
-
-# Close the stream when finished
-p.close(stream_id="Beethoven Piano Sonata No.1") \
- .execute()
+r.stream("vocals") \
+    .chunk_size(1024 * 32) \ 
+    .batch_size(50) \
+    .compression(True) \
+    .compression_level(8) \
+    .execute(data)
 ```
-
-### Extracting and Formating
-The below example retrieves a reference timestamp, and uses it to extract an audio segment based on the given range. 
-It then converts the extracted PCM data into MP3 format and writes the resulting bytes to a file.
+If `chunk_size`, `batch_size`, `compression` and `compression_level` are not provided, the default values will be used.
 
 ```python
-from racs import Racs
-from datetime import datetime, timezone,  timedelta
-
-# Connect to the RACS server
-r = Racs(host="localhost", port=6381, pool_size=3)
-
-# Get pipeline
-p = r.pipeline()
-
-# Get the reference timestamp (in milliseconds)
-ref = p.info(stream_id="Beethoven Piano Sonata No.1", attr="ref") \
-       .execute()
-
-# Convert milliseconds to datetime
-frm = datetime.fromtimestamp(ref / 1000, tz=timezone.utc)
-# Compute end time by adding one day
-to = frm + timedelta(days=1)
-
-# Extract PCM data between `frm` and `to`
-# Convert (format) the audio to MP3
-res = p.extract(stream_id="Beethoven Piano Sonata No.1", frm=frm, to=to) \
-       .format(mime_type="audio/mp3", sample_rate=44100, channels=2, bit_depth=16) \
-       .execute()
-
-# Use or save the MP3 bytes
-# e.g. write them to a file
-with open("beethoven.mp3", "wb") as f:
-    f.write(res)
+# // Stream PCM data to the server
+r.stream("vocals").execute(data)
 ```
 
-To extract PCM data without formating, do the following instead:
-
-```python
-res = p.extract(stream_id="Beethoven Piano Sonata No.1", frm=frm, to=to) \
-       .execute()
-```
-
-### Querying Streams and Metadata
-
-Stream ids stored in RACS can be queried using the ``search`` function.
-``search`` takes a glob pattern and returns a list of streams ids matching the pattern.
+Stream ids stored in RACS can be queried using the ``list`` command. ``list`` takes a glob pattern and returns a list of streams ids matching the pattern.
 
 ```python
 from racs import Racs
 
 # Connect to the RACS server
-r = Racs(host="localhost", port=6381, pool_size=3)
+r = Racs(host="localhost", port=6381)
 
 # Get pipeline
 p = r.pipeline()
 
 # Run list command matching "*" pattern
-res = p.search(pattern="*").execute()
+res = p.list(pattern="*").execute()
 
-# ['Beethoven Piano Sonata No.1']
+# ['vocals']
 print(res)
 ```
 
-Stream metadata can be queried using the ``info`` function. 
-``info`` takes the stream id and metadata attribute as parameters.
+### Extracting Audio
+The below example extracts a 30-second PCM audio segment using the ``range`` command. It then encodes the data to MP3 and writes the resulting bytes to a file.
 
 ```python
 from racs import Racs
 
 # Connect to the RACS server
-r = Racs(host="localhost", port=6381, pool_size=3)
+r = Racs(host="localhost", port=6381)
+
+# Get pipeline
+p = r.pipeline()
+
+# Extract PCM data
+# Encode the audio to MP3
+res = p.range(stream_id="vocals", start=0.0, duration=30.0) \
+       .encode(mime_type="audio/mp3") \
+       .execute()
+
+# Write to a file
+with open("vocals.mp3", "wb") as f:
+    f.write(res)
+```
+
+### Metadata
+
+Stream metadata can be retrieved using the ``meta`` command. ``meta`` takes the stream id and metadata attribute as parameters.
+
+```python
+from racs import Racs
+
+# Connect to the RACS server
+r = Racs(host="localhost", port=6381)
 
 # Get pipeline
 p = r.pipeline()
 
 # Get sample rate attribute for stream
-res = p.info(stream_id="Beethoven Piano Sonata No.1", attr="sample_rate").execute()
+res = p.meta(stream_id="vocals", attr="sample_rate").execute()
 
 # Print the sample rate
 print(res) # 44100
 ```
 
-The supported attributes are:
+The supported metadata attributes are:
 
-| Attribute       | Description                                |
-|-----------------|--------------------------------------------|
-| `channels`      | Channel count of the audio stream.         |
-| `sample_rate`   | Sample rate of the audio stream (Hz).      |
-| `bit_depth`     | Bit depth of the audio stream.             |
-| `ref`           | Reference timestamp (milliseconds UTC).    |
-| `size`          | Size of audio stream in bytes.             |
+| Attribute     | Description                                     |
+|---------------|-------------------------------------------------|
+| `channels`    | Channel count of the audio stream.              |
+| `sample_rate` | Sample rate of the audio stream (Hz).           |
+| `bit_depth`   | Bit depth of the audio stream.                  |
+| `ref`         | Reference timestamp (milliseconds UTC).         |
+| `size`        | Size of the uncompressed audio stream in bytes. |
 
 ### Raw Command Execution
 
@@ -157,7 +139,7 @@ To execute raw command strings, use the ``execute_command`` function.
 ```python
 from racs import Racs
 
-r = Racs(host="localhost", port=6381, pool_size=3)
+r = Racs(host="localhost", port=6381)
 
 res = r.execute_command("EVAL '(+ 1 2 3)'")
 ```
