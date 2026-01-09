@@ -1,9 +1,16 @@
 # py-racs
 
-![PyPI - Version](https://img.shields.io/pypi/v/:packageName)
-
+[![PyPI - Version](https://img.shields.io/pypi/v/racs)](https://pypi.org/project/racs/)
 
 **py-racs** is the python client library for [RACS](https://github.com/racslabs/racs).
+
+## Installation
+
+To install py-racs run:
+
+```bash
+pip install racs
+```
 
 ## Basic Operations
 
@@ -117,13 +124,13 @@ print(res) # 44100
 
 The supported metadata attributes are:
 
-| Attribute     | Description                             |
-|---------------|-----------------------------------------|
-| `channels`    | Channel count of the audio stream.      |
-| `sample_rate` | Sample rate of the audio stream (Hz).   |
-| `bit_depth`   | Bit depth of the audio stream.          |
-| `ref`         | Reference timestamp (milliseconds UTC). |
-| `size`        | Size of the audio stream in bytes.      |
+| Attribute     | Description                                     |
+|---------------|-------------------------------------------------|
+| `channels`    | Channel count of the audio stream.              |
+| `sample_rate` | Sample rate of the audio stream (Hz).           |
+| `bit_depth`   | Bit depth of the audio stream.                  |
+| `ref`         | Reference timestamp (milliseconds UTC).         |
+| `size`        | Size of the uncompressed audio stream in bytes. |
 
 ### Raw Command Execution
 

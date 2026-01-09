@@ -403,7 +403,6 @@ class Pipeline(Command):
             The unpacked response from the RACS server.
         """
         command = " |> ".join(self._commands)
-        print(command)
         return self.execute_command(command)
 
     def reset(self):
