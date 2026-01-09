@@ -43,10 +43,10 @@ p.create(stream_id="vocals", sample_rate=44100, channels=2, bit_depth=16).execut
 # Reset pipeline
 p.reset()
 
-# // Prepare list of PCM samples (interleaved L/R, 16- or 24-bit integers)
+# Prepare list of PCM samples (interleaved L/R, 16- or 24-bit integers)
 data = [...]
 
-# // Stream PCM data to the server
+# Stream PCM data to the server
 r.stream("vocals") \
     .chunk_size(1024 * 32) \ 
     .batch_size(50) \
@@ -57,7 +57,7 @@ r.stream("vocals") \
 If `chunk_size`, `batch_size`, `compression` and `compression_level` are not provided, the default values will be used.
 
 ```python
-# // Stream PCM data to the server
+# Stream PCM data to the server
 r.stream("vocals").execute(data)
 ```
 
